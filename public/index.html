@@ -3,14 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- ── Primary Meta ── -->
+    <title>KAIRO – Your AI Assistant</title>
+    <meta name="description" content="KAIRO is your personal AI assistant for everything — chat, create, and explore with the power of AI." />
+    <meta name="application-name" content="KAIRO" />
+    <meta name="author" content="KAIRO" />
+
+    <!-- ── Theme Color ── -->
     <meta name="theme-color" content="#000000" />
-    <title>KAIRO Mobile</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
+    <meta name="msapplication-TileColor" content="#000000" />
+    <meta name="msapplication-TileImage" content="/icons/icon-192.png" />
+
+    <!-- ── Favicon (like Vercel / GitHub) ── -->
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/icons/favicon-16x16.png" sizes="16x16" type="image/png" />
+    <link rel="icon" href="/icons/favicon-32x32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+
+    <!-- ── PWA Manifest ── -->
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- ── Open Graph (link preview image) ── -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="KAIRO – Your AI Assistant" />
+    <meta property="og:description" content="Your personal AI assistant for everything." />
+    <meta property="og:image" content="/icons/icon-512.png" />
+
+    <!-- ── Fonts ── -->
+    <link rel="stylesheet" href="/fonts/inter-local.css" />
+
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -81,7 +103,12 @@
                 <input id="signin-email" name="email" type="email" placeholder="you@example.com" />
 
                 <label class="field-label" for="signin-password">Password</label>
-                <input id="signin-password" name="password" type="password" placeholder="••••••••" />
+                <div class="password-field-wrapper">
+                  <input id="signin-password" name="password" type="password" placeholder="••••••••" />
+                  <button type="button" class="password-toggle" aria-label="Toggle password visibility">
+                    <i data-lucide="eye" class="eye-icon"></i>
+                  </button>
+                </div>
 
                 <div class="auth-row auth-row--split">
                   <label class="check-row">
@@ -92,20 +119,29 @@
                 </div>
 
                 <button class="cta-button cta-button--full" type="submit">Login</button>
-
-                <div class="divider"><span>or continue with</span></div>
-
-                <div class="social-row">
-                  <button type="button" class="social-button" id="google-signin-btn">
-                    <svg width="16" height="16" viewBox="0 0 48 48" style="vertical-align:middle;margin-right:6px"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-                    Google
-                  </button>
-                  <button type="button" class="social-button" id="apple-signin-btn">
-                    <svg width="14" height="16" viewBox="0 0 814 1000" style="vertical-align:middle;margin-right:6px;fill:currentColor"><path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165 40.8s-105.7-57.2-155.2-127.3C46.7 790.7 0 663 0 541.8c0-207.8 199.7-313 396-313 102.9 0 197.1 38.9 255.5 98.3 48.4 50.3 72 99.9 75.5 107.6 3.7 8.2 5.1 16 5.1 23.1zm-261-136.9c-2.6-42.5-11.2-84.5-38.9-119.4C452.7 47 397.3 19 346.5 19c-2.8 0-5.7.2-8.5.5 5.8 41.5 16.2 82.2 42.8 116.7 27.3 35.3 82.2 62.9 146.3 67.8z"/></svg>
-                    Apple
-                  </button>
-                </div>
               </form>
+
+              <div class="auth-divider"><span>or continue with</span></div>
+
+              <div class="social-auth-row">
+                <button type="button" class="social-auth-btn social-auth-btn--google" id="google-signin-btn" aria-label="Sign in with Google">
+                  <div class="social-icon-orb">
+                    <svg width="24" height="24" viewBox="0 0 48 48" aria-hidden="true" style="width: 24px; height: 24px;">
+                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                    </svg>
+                  </div>
+                  <span>Google</span>
+                </button>
+                <button type="button" class="social-auth-btn social-auth-btn--apple" id="apple-signin-btn" aria-label="Sign in with Apple">
+                  <div class="social-icon-orb">
+                    <svg width="20" height="24" viewBox="0 0 814 1000" aria-hidden="true" style="width: 20px; height: 24px;"><path fill="currentColor" d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-57.8-155.5-127.4C46 790.8 0 683.6 0 582.4c0-172.6 112.2-263.5 222.4-263.5 60 0 109.8 40.3 165 40.3 52.7 0 112.2-44.3 176.1-44.3zm-87.3-226.6C727.7 75.7 744 36.7 744 0c0-2.6 0-5.2-.3-7.8-41.6 1.6-89.9 27.3-119.3 58.4-24.8 27.1-46.3 66.1-46.3 104.7 0 2.9.3 5.8.6 8.4 3.2.6 7.1.9 11.3.9 37.8 0 85.5-23.9 110.7-50.2z"/></svg>
+                  </div>
+                  <span>Apple</span>
+                </button>
+              </div>
 
               <p class="auth-switch">
                 Don’t have an account?
@@ -130,7 +166,12 @@
                 <input id="signup-email" name="email" type="email" placeholder="you@example.com" />
 
                 <label class="field-label" for="signup-password">Password</label>
-                <input id="signup-password" name="password" type="password" placeholder="Create a password" />
+                <div class="password-field-wrapper">
+                  <input id="signup-password" name="password" type="password" placeholder="Create a password" />
+                  <button type="button" class="password-toggle" aria-label="Toggle password visibility">
+                    <i data-lucide="eye" class="eye-icon"></i>
+                  </button>
+                </div>
 
                 <label class="check-row">
                   <input type="checkbox" checked />
@@ -138,16 +179,29 @@
                 </label>
 
                 <button class="cta-button cta-button--full" type="submit">Sign Up</button>
-
-                <div class="divider"><span>or continue with</span></div>
-
-                <div class="social-row">
-                  <button type="button" class="social-button" id="google-signup-btn">
-                    <svg width="16" height="16" viewBox="0 0 48 48" style="vertical-align:middle;margin-right:6px"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-                    Continue with Google
-                  </button>
-                </div>
               </form>
+
+              <div class="auth-divider"><span>or continue with</span></div>
+
+              <div class="social-auth-row">
+                <button type="button" class="social-auth-btn social-auth-btn--google" id="google-signup-btn" aria-label="Sign up with Google">
+                  <div class="social-icon-orb">
+                    <svg width="24" height="24" viewBox="0 0 48 48" aria-hidden="true" style="width: 24px; height: 24px;">
+                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                    </svg>
+                  </div>
+                  <span>Google</span>
+                </button>
+                <button type="button" class="social-auth-btn social-auth-btn--apple" id="apple-signup-btn" aria-label="Sign up with Apple">
+                  <div class="social-icon-orb">
+                    <svg width="20" height="24" viewBox="0 0 814 1000" aria-hidden="true" style="width: 20px; height: 24px;"><path fill="currentColor" d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-57.8-155.5-127.4C46 790.8 0 683.6 0 582.4c0-172.6 112.2-263.5 222.4-263.5 60 0 109.8 40.3 165 40.3 52.7 0 112.2-44.3 176.1-44.3zm-87.3-226.6C727.7 75.7 744 36.7 744 0c0-2.6 0-5.2-.3-7.8-41.6 1.6-89.9 27.3-119.3 58.4-24.8 27.1-46.3 66.1-46.3 104.7 0 2.9.3 5.8.6 8.4 3.2.6 7.1.9 11.3.9 37.8 0 85.5-23.9 110.7-50.2z"/></svg>
+                  </div>
+                  <span>Apple</span>
+                </button>
+              </div>
 
               <p class="auth-switch">
                 Already have an account?
@@ -164,32 +218,61 @@
                 </button>
                 <h2>KAIRO</h2>
                 <div class="kairo-topbar-right">
-                  <!-- New + Clear chat actions (shown only when chat active) -->
-                  <div class="home-chat-actions is-hidden" id="home-chat-actions">
-                    <button type="button" class="chip-button chip-button--new" id="home-new-chat-btn" aria-label="New chat">+</button>
-                    <button type="button" class="chip-button" id="home-clear-chat-btn">Clear</button>
-                  </div>
                   <button type="button" class="avatar-button avatar-button--gemini" data-target="profile" aria-label="Open profile" id="avatar-button">U</button>
                 </div>
               </header>
 
+              <!-- Hidden div kept for JS compatibility -->
+              <div class="home-chat-actions is-hidden" id="home-chat-actions" style="display:none!important"></div>
+
               <section class="home-menu is-hidden" id="home-menu" aria-label="Menu options">
-                <button type="button" class="home-menu-item" id="home-menu-new-chat">New Chat</button>
-                <button type="button" class="home-menu-item" data-target="history">History</button>
-                <button type="button" class="home-menu-item" data-target="profile">Profile</button>
-                <button type="button" class="home-menu-item" data-target="signin">Sign Out</button>
+                <button type="button" class="home-menu-item home-menu-item--icon" id="home-menu-new-chat">
+                  <i data-lucide="pen-line" class="home-menu-icon" aria-hidden="true"></i> New Chat
+                </button>
+                <button type="button" class="home-menu-item home-menu-item--icon" id="home-clear-chat-btn">
+                  <i data-lucide="trash-2" class="home-menu-icon" aria-hidden="true"></i> Clear Chat
+                </button>
+                <button type="button" class="home-menu-item home-menu-item--icon" data-target="history">
+                  <i data-lucide="clock" class="home-menu-icon" aria-hidden="true"></i> History
+                </button>
+                <button type="button" class="home-menu-item home-menu-item--icon" data-target="profile">
+                  <i data-lucide="user" class="home-menu-icon" aria-hidden="true"></i> Profile
+                </button>
+                <div class="home-menu-divider"></div>
+                <button type="button" class="home-menu-item home-menu-item--signout" data-target="signin">
+                  <i data-lucide="log-out" class="home-menu-icon" aria-hidden="true"></i> Sign Out
+                </button>
               </section>
 
-              <!-- Greeting: shown when no chat messages -->
-              <section class="kairo-greeting" id="kairo-home-greeting" aria-label="Greeting">
-                <p id="home-greeting">Hi there</p>
-                <h3>Where should we start?</h3>
-              </section>
+              <!-- Content area -->
+              <div class="chat-content">
+                <!-- Greeting: shown when no chat messages -->
+                <section class="kairo-greeting" id="kairo-home-greeting" aria-label="Greeting">
+                  <p id="home-greeting">Good Morning ☀️</p>
+                  <h3>How can I help you today?</h3>
 
-              <!-- Chat stream: shown once conversation begins -->
-              <div class="chat-stream" id="chat-stream" aria-live="polite"></div>
+                  <!-- Quick suggestion chips -->
+                  <div class="kairo-suggestions" id="kairo-suggestions">
+                    <button type="button" class="kairo-suggestion-chip" data-suggestion="Explain quantum computing in simple terms">
+                      <i data-lucide="zap" aria-hidden="true"></i>&nbsp; Explain something complex
+                    </button>
+                    <button type="button" class="kairo-suggestion-chip" data-suggestion="Write a short motivational message for me">
+                      <i data-lucide="heart" aria-hidden="true"></i>&nbsp; Motivate me
+                    </button>
+                    <button type="button" class="kairo-suggestion-chip" data-suggestion="Give me 5 creative ideas for a weekend project">
+                      <i data-lucide="lightbulb" aria-hidden="true"></i>&nbsp; Creative ideas
+                    </button>
+                    <button type="button" class="kairo-suggestion-chip" data-suggestion="What are today's top AI trends?">
+                      <i data-lucide="trending-up" aria-hidden="true"></i>&nbsp; AI trends today
+                    </button>
+                  </div>
+                </section>
 
-              <!-- Full composer (same as old chat screen) -->
+                <!-- Chat stream: shown once conversation begins -->
+                <div class="chat-stream is-hidden" id="chat-stream" aria-live="polite"></div>
+              </div>
+
+              <!-- Composer -->
               <form class="chat-composer" id="chat-form">
                 <div id="image-preview" class="image-preview is-hidden" aria-live="polite"></div>
 
@@ -202,12 +285,13 @@
                 ></textarea>
 
                 <div class="composer-actions">
-                  <label class="attach-chip icon-chip" for="image-input" title="Attach image"><i data-lucide="plus" aria-hidden="true"></i></label>
+                  <label class="attach-chip icon-chip" for="image-input" title="Attach image" aria-label="Attach image"><i data-lucide="paperclip" aria-hidden="true"></i></label>
                   <input id="image-input" type="file" accept="image/*" hidden />
-                  <button id="stt-btn" type="button" class="chip-button icon-chip" title="Speech to text" aria-label="Speech to text"><i data-lucide="mic" aria-hidden="true"></i></button>
-                  <button id="speech-toggle" type="button" class="voice-chip icon-chip" aria-pressed="false" title="Text to speech" aria-label="Text to speech"><i data-lucide="audio-lines" aria-hidden="true"></i></button>
+                  <button id="stt-btn" type="button" class="chip-button icon-chip" title="Voice input" aria-label="Voice input"><i data-lucide="mic" aria-hidden="true"></i></button>
+
                   <button id="send" type="submit" class="send-button" aria-label="Send message">Send</button>
                 </div>
+                <button id="home-new-chat-btn" hidden aria-hidden="true"></button>
               </form>
             </div>
           </section>
@@ -220,6 +304,9 @@
                   <p class="eyebrow">History</p>
                   <h2>Your Chats</h2>
                 </div>
+                <button type="button" class="kairo-icon-button" data-nav-target="home" title="New Chat" aria-label="New Chat">
+                  <i data-lucide="pen-line" aria-hidden="true"></i>
+                </button>
               </div>
 
               <div class="glass-panel history-panel">
@@ -250,6 +337,31 @@
                   </div>
                 </div>
 
+                <div class="stats-grid">
+                  <div class="stat-card">
+                    <strong id="stat-chats">0</strong>
+                    <span>Sessions</span>
+                  </div>
+                  <div class="stat-card">
+                    <strong id="stat-messages">0</strong>
+                    <span>Messages</span>
+                  </div>
+                  <div class="stat-card">
+                    <strong id="stat-voice">Off</strong>
+                    <span>Voice</span>
+                  </div>
+                </div>
+
+                <div class="profile-actions">
+                  <button type="button" class="profile-action-btn" data-target="history">
+                    <i data-lucide="history" aria-hidden="true"></i>
+                    <span>View History</span>
+                  </button>
+                  <button type="button" class="profile-action-btn profile-action-btn--danger" data-target="signin">
+                    <i data-lucide="log-out" aria-hidden="true"></i>
+                    <span>Sign Out</span>
+                  </button>
+                </div>
               </section>
 
             </div>
@@ -272,9 +384,12 @@
         </nav>
       </section>
     </main>
-
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script type="module" src="firebase-auth.js"></script>
+    <script src="/lucide.standalone.js"></script>
     <script src="app.js"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/service-worker.js");
+      }
+    </script>
   </body>
 </html>

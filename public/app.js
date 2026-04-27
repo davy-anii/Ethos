@@ -2,6 +2,35 @@ const STORAGE_PROFILE = "kairo_profile";
 const STORAGE_HISTORY = "kairo_history";
 const STORAGE_VOICE = "kairo_voice";
 
+// ─── Local Auth & Storage ───
+const users = {
+  "demo@kairo.com": "password123"
+};
+
+function localLogin(email, password) {
+  if (users[email] === password) {
+    localStorage.setItem("kairo_user", email);
+    setScreen("home");
+  } else {
+    alert("Wrong email/password");
+  }
+}
+
+function localLogout() {
+  localStorage.removeItem("kairo_user");
+  setScreen("signin");
+}
+
+async function saveHistoryToStorage(chatHistory) {
+  localStorage.setItem(STORAGE_HISTORY, JSON.stringify(chatHistory));
+  console.log("Chat saved locally");
+}
+
+async function loadHistoryFromStorage() {
+  const saved = localStorage.getItem(STORAGE_HISTORY);
+  return saved ? JSON.parse(saved) : [];
+}
+
 const screenEls = [...document.querySelectorAll("[data-screen]")];
 const navButtons = [...document.querySelectorAll("[data-nav-target]")];
 const targetButtons = [...document.querySelectorAll("[data-target]")];
@@ -47,8 +76,30 @@ if (window.lucide?.createIcons) {
   window.lucide.createIcons();
 }
 
+// ─── Password Toggle Logic ───
+document.querySelectorAll(".password-toggle").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const wrapper = btn.closest(".password-field-wrapper");
+    const input = wrapper.querySelector("input");
+    // Target either the original <i> or the generated <svg>
+    const icon = btn.querySelector("[data-lucide]");
+    
+    if (input.type === "password") {
+      input.type = "text";
+      icon?.setAttribute("data-lucide", "eye-off");
+    } else {
+      input.type = "password";
+      icon?.setAttribute("data-lucide", "eye");
+    }
+    
+    // Re-run Lucide to update the icon
+    if (window.lucide?.createIcons) {
+      window.lucide.createIcons();
+    }
+  });
+});
+
 const appScreens = new Set(["home", "chat", "history", "profile"]);
-const initialChatGreeting = "BEEP BOOP! Hello! I am KAIRO, your AI assistant.";
 
 const state = {
   activeScreen: "onboarding",
@@ -95,6 +146,7 @@ function saveProfile() {
 
 function saveHistory() {
   localStorage.setItem(STORAGE_HISTORY, JSON.stringify(state.chatHistory.slice(0, 50)));
+  saveHistoryToStorage(state.chatHistory);
 }
 
 function formatTime(date = new Date()) {
@@ -113,12 +165,13 @@ function formatDateLabel(value) {
 }
 
 function getGreeting() {
-  const hour = new Date().getHours();
-  const name = state.profile.name || "there";
-
-  if (hour < 12) return `Good Morning, ${name} ☀️`;
-  if (hour < 18) return `Good Afternoon, ${name} 🌤️`;
-  return `Good Evening, ${name} 🌙`;
+  const h    = new Date().getHours();
+  const name = (state.profile.name || "there").split(" ")[0];
+  if (h >= 0  && h < 5)  return `Hey ${name}! 🌙`;
+  if (h >= 5  && h < 12) return `Good Morning, ${name} ☀️`;
+  if (h >= 12 && h < 17) return `Good Afternoon, ${name} 🌤️`;
+  if (h >= 17 && h < 21) return `Good Evening, ${name} 🌕`;
+  return                          `Good Night, ${name} 🌚`;
 }
 
 function updateClock() {
@@ -186,42 +239,171 @@ function renderProfile() {
   }
 }
 
-function stopSpeaking() {
-  if ("speechSynthesis" in window) {
-    window.speechSynthesis.cancel();
-  }
+// ─── Global TTS state tracker ───
+let _currentSpeakBtn   = null;
+let _currentSpeakText  = null;
+let _isSpeaking        = false;
+let _speechUnlocked    = false;
+
+function unlockSpeech() {
+  if (_speechUnlocked || !("speechSynthesis" in window)) return;
+  const utterance = new SpeechSynthesisUtterance("");
+  window.speechSynthesis.speak(utterance);
+  _speechUnlocked = true;
 }
 
-function speakText(text) {
+function stopSpeaking() {
+  _isSpeaking = false;
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  if (_currentSpeakBtn) {
+    _currentSpeakBtn.textContent  = "Speak";
+    _currentSpeakBtn.classList.remove("is-speaking");
+    _currentSpeakBtn = null;
+  }
+  _currentSpeakText = null;
+}
+// Pre-load voices so they are ready when needed
+if ("speechSynthesis" in window) {
+  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+  window.speechSynthesis.getVoices();
+}
+
+function getProfessionalVoice(langCode) {
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+
+  const langVoices = voices.filter(v => v.lang.startsWith(langCode));
+  if (!langVoices.length) return null;
+
+  // Search for high-quality / natural-sounding voices
+  const premium = langVoices.find(v => 
+    v.name.includes("Premium") || 
+    v.name.includes("Enhanced") || 
+    v.name.includes("Google") || 
+    v.name.includes("Online") ||
+    v.name.includes("Natural")
+  );
+  
+  return premium || langVoices[0];
+}
+
+// Clean markdown characters from text before speaking
+function cleanTextForSpeech(text) {
+  return text
+    .replace(/[*_~`#]/g, '') // Remove markdown symbols
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Extract text from links
+    .replace(/(?:https?|ftp):\/\/[\n\S]+/g, 'link') // Replace URLs with word "link"
+    .replace(/\s+/g, ' ') // Collapse whitespace
+    .trim();
+}
+
+function speakText(text, btn) {
   if (!("speechSynthesis" in window) || !text) return;
-  stopSpeaking();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = 1;
-  utterance.pitch = 1;
-  utterance.volume = 1;
-  window.speechSynthesis.speak(utterance);
+
+  // ─── INTERRUPT: if already speaking this same text or any text, stop ───
+  if (_isSpeaking) {
+    stopSpeaking();
+    return;
+  }
+
+  // Update button state
+  _currentSpeakBtn  = btn || null;
+  _currentSpeakText = text;
+  _isSpeaking       = true;
+  if (btn) {
+    btn.textContent = "Stop";
+    btn.classList.add("is-speaking");
+  }
+
+  window.speechSynthesis.cancel(); // flush any stuck utterance
+
+  // Chrome bug: must create utterance AFTER cancel, with tiny delay
+  setTimeout(() => {
+    if (!_isSpeaking) return;
+
+    // Clean text and split by sentences to prevent Chrome's 15-second cutoff bug
+    const cleanText = cleanTextForSpeech(text);
+    const chunks = cleanText.match(/[^.!?।\n]+[.!?।\n]*/g) || [cleanText];
+    
+    // Auto-detect script to ensure correct language engine
+    let targetLang = navigator.language.split("-")[0] || "en"; 
+    if (/[\u0980-\u09FF]/.test(cleanText)) targetLang = "bn"; // Bengali
+    if (/[\u0900-\u097F]/.test(cleanText)) targetLang = "hi"; // Hindi
+
+    // Select the best available voice
+    const bestVoice = getProfessionalVoice(targetLang);
+    let currentIndex = 0;
+
+    function speakNextChunk() {
+      if (!_isSpeaking || currentIndex >= chunks.length) {
+        stopSpeaking();
+        return;
+      }
+
+      const chunkText = chunks[currentIndex].trim();
+      if (!chunkText) {
+        currentIndex++;
+        return speakNextChunk();
+      }
+
+      const utterance = new SpeechSynthesisUtterance(chunkText);
+      if (bestVoice) {
+        utterance.voice = bestVoice;
+        utterance.lang  = bestVoice.lang;
+      } else {
+        utterance.lang = targetLang === "bn" ? "bn-IN" : targetLang === "hi" ? "hi-IN" : navigator.language;
+      }
+
+      // Slightly adjust pitch and rate to sound less robotic and more friendly
+      utterance.rate   = 0.95; 
+      utterance.pitch  = 1.05; 
+      utterance.volume = 1;
+
+      utterance.onend = () => {
+        currentIndex++;
+        speakNextChunk();
+      };
+
+      utterance.onerror = (e) => {
+        if (e.error === "interrupted" || e.error === "canceled") return;
+        currentIndex++;
+        speakNextChunk();
+      };
+
+      window.speechSynthesis.speak(utterance);
+    }
+
+    speakNextChunk();
+
+  }, 50);
 }
 
 function updateSpeechToggle() {
   const enabled = String(state.autoSpeakEnabled);
   if (speechToggleEl) speechToggleEl.setAttribute("aria-pressed", enabled);
   if (homeSpeechToggleEl) homeSpeechToggleEl.setAttribute("aria-pressed", enabled);
+  
+  localStorage.setItem(STORAGE_VOICE, state.autoSpeakEnabled ? "on" : "off");
 }
 
 function startSpeechToText(textareaEl, triggerBtnEl) {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   if (!SpeechRecognition) {
+    alert("Speech-to-text is not supported in this browser. If you are on iPhone/iPad, please make sure you are using Safari.");
     appendChatMessage({ role: "bot", text: "Speech-to-text is not supported in this browser.", time: Date.now() });
     return;
+  }
+
+  if (triggerBtnEl) {
+    triggerBtnEl.classList.add("is-listening");
+    triggerBtnEl.disabled = true;
   }
 
   const recognition = new SpeechRecognition();
   recognition.lang = "en-US";
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
-
-  if (triggerBtnEl) triggerBtnEl.disabled = true;
 
   recognition.onresult = (event) => {
     const transcript = event.results?.[0]?.[0]?.transcript?.trim();
@@ -234,21 +416,66 @@ function startSpeechToText(textareaEl, triggerBtnEl) {
   };
 
   recognition.onend = () => {
-    if (triggerBtnEl) triggerBtnEl.disabled = false;
+    if (triggerBtnEl) {
+      triggerBtnEl.classList.remove("is-listening");
+      triggerBtnEl.disabled = false;
+    }
     textareaEl.focus();
   };
 
-  recognition.onerror = () => {
-    if (triggerBtnEl) triggerBtnEl.disabled = false;
+  recognition.onerror = (event) => {
+    console.error("Speech recognition error:", event.error);
+    if (triggerBtnEl) {
+      triggerBtnEl.classList.remove("is-listening");
+      triggerBtnEl.disabled = false;
+    }
+    if (event.error === 'not-allowed') {
+      alert("Microphone access was denied! Please allow microphone permissions in your device/browser settings.");
+      appendChatMessage({ role: "bot", text: "Microphone access is blocked. Please allow it in your browser settings.", time: Date.now() });
+    }
   };
 
-  recognition.start();
+  try {
+    recognition.start();
+  } catch (err) {
+    console.error("Failed to start recognition:", err);
+    if (triggerBtnEl) {
+      triggerBtnEl.classList.remove("is-listening");
+      triggerBtnEl.disabled = false;
+    }
+    alert("Could not start microphone. Make sure permissions are granted.");
+  }
 }
 
 function readImageAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_DIMENSION = 1024;
+        let { width, height } = img;
+        
+        if (width > height && width > MAX_DIMENSION) {
+          height = Math.round((height * MAX_DIMENSION) / width);
+          width = MAX_DIMENSION;
+        } else if (height > MAX_DIMENSION) {
+          width = Math.round((width * MAX_DIMENSION) / height);
+          height = MAX_DIMENSION;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Compress to JPEG with 0.8 quality to ensure it fits comfortably within Vercel's 4.5MB limit
+        resolve(canvas.toDataURL("image/jpeg", 0.8));
+      };
+      img.onerror = () => reject(new Error("Could not load image for compression."));
+      img.src = e.target.result;
+    };
     reader.onerror = () => reject(new Error("Could not read image."));
     reader.readAsDataURL(file);
   });
@@ -291,6 +518,83 @@ function clearChatStream() {
   chatStreamEl.innerHTML = "";
 }
 
+// ─── Lightweight Markdown → safe HTML renderer ───
+function parseMarkdown(raw) {
+  if (!raw) return "";
+
+  // 1. Escape raw HTML first to prevent XSS
+  const escaped = raw
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  const lines = escaped.split("\n");
+  const out   = [];
+  let inList  = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+
+    // Headings: ### or ## or #
+    const headingMatch = line.match(/^(#{1,4})\s+(.+)/);
+    if (headingMatch) {
+      if (inList) { out.push("</ul>"); inList = false; }
+      const level = Math.min(headingMatch[1].length + 3, 6); // h4–h6
+      out.push(`<h${level} class="md-heading">${inlineFormat(headingMatch[2])}</h${level}>`);
+      continue;
+    }
+
+    // Bullet list: lines starting with - * • ·
+    const bulletMatch = line.match(/^[\-\*•·]\s+(.+)/);
+    if (bulletMatch) {
+      if (!inList) { out.push("<ul class=\"md-list\">"); inList = true; }
+      out.push(`<li>${inlineFormat(bulletMatch[1])}</li>`);
+      continue;
+    }
+
+    // Numbered list: lines starting with 1. 2. etc
+    const numMatch = line.match(/^\d+\.\s+(.+)/);
+    if (numMatch) {
+      if (inList) { out.push("</ul>"); inList = false; }
+      // Treat numbered items as list items for simplicity
+      out.push(`<ul class="md-list"><li>${inlineFormat(numMatch[1])}</li></ul>`);
+      continue;
+    }
+
+    // Close list if non-bullet line
+    if (inList && line.trim() !== "") { out.push("</ul>"); inList = false; }
+
+    // Blank line → paragraph break
+    if (line.trim() === "") {
+      if (inList) { out.push("</ul>"); inList = false; }
+      out.push("<br>");
+      continue;
+    }
+
+    out.push(`<p class="md-para">${inlineFormat(line)}</p>`);
+  }
+
+  if (inList) out.push("</ul>");
+  return out.join("");
+}
+
+// Inline formatting: bold, italic, inline-code
+function inlineFormat(text) {
+  return text
+    // Bold+italic: ***text*** or ___text___
+    .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
+    // Bold: **text** or __text__
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/__(.+?)__/g, "<strong>$1</strong>")
+    // Italic: *text* or _text_
+    .replace(/\*([^\*]+)\*/g, "<em>$1</em>")
+    .replace(/_([^_]+)_/g, "<em>$1</em>")
+    // Inline code: `code`
+    .replace(/`([^`]+)`/g, "<code class=\"md-code\">$1</code>")
+    // Em dash shorthand: --
+    .replace(/\s--\s/g, " — ");
+}
+
 function appendChatMessage(message) {
   const role = message.role;
   const text = message.text;
@@ -304,10 +608,18 @@ function appendChatMessage(message) {
   messageNode.appendChild(label);
 
   if (message.imageAttached) {
-    const imageHint = document.createElement("div");
-    imageHint.className = "chat-content";
-    imageHint.textContent = "[Image attached]";
-    messageNode.appendChild(imageHint);
+    if (message.attachedImageDataUrl) {
+      const img = document.createElement("img");
+      img.src = message.attachedImageDataUrl;
+      img.alt = "Attached image";
+      img.style.cssText = "width:100%;border-radius:12px;margin-bottom:8px;display:block;max-height:240px;object-fit:cover;border:1px solid rgba(0,0,0,0.1);";
+      messageNode.appendChild(img);
+    } else {
+      const imageHint = document.createElement("div");
+      imageHint.className = "chat-content";
+      imageHint.textContent = "[Image attached]";
+      messageNode.appendChild(imageHint);
+    }
   }
 
   const content = document.createElement("div");
@@ -326,7 +638,11 @@ function appendChatMessage(message) {
       caption.textContent = text;
       content.appendChild(caption);
     }
+  } else if (role === "bot") {
+    // Bot messages: render markdown as HTML
+    content.innerHTML = parseMarkdown(text);
   } else {
+    // User messages: plain text (safe, no markdown)
     content.textContent = text;
   }
   messageNode.appendChild(content);
@@ -336,19 +652,7 @@ function appendChatMessage(message) {
   meta.innerHTML = `<span>${formatTime(new Date(message.time || Date.now()))}</span>`;
   messageNode.appendChild(meta);
 
-  if (role === "bot") {
-    const actions = document.createElement("div");
-    actions.className = "chat-actions";
 
-    const speakButton = document.createElement("button");
-    speakButton.type = "button";
-    speakButton.className = "speak-btn";
-    speakButton.textContent = "Speak";
-    speakButton.addEventListener("click", () => speakText(text));
-
-    actions.appendChild(speakButton);
-    messageNode.appendChild(actions);
-  }
 
   chatStreamEl.appendChild(messageNode);
   chatStreamEl.scrollTop = chatStreamEl.scrollHeight;
@@ -384,21 +688,15 @@ function renderHistoryLists() {
   if (historyListEl) historyListEl.innerHTML = cards.join("");
 }
 
-function startNewSession() {
+function startNewSession(silent = false) {
   const id = `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   state.currentSessionId = id;
-  state.currentMessages = [
-    {
-      role: "bot",
-      text: initialChatGreeting,
-      time: Date.now(),
-      imageAttached: false
-    }
-  ];
+  state.currentMessages = [];
+  clearChatStream();
 }
 
 function persistCurrentSession() {
-  if (!state.currentSessionId || state.currentMessages.length <= 1) return;
+  if (!state.currentSessionId || state.currentMessages.length <= 0) return;
 
   const userMessages = state.currentMessages.filter((m) => m.role === "user");
   const botMessages = state.currentMessages.filter((m) => m.role === "bot");
@@ -411,7 +709,10 @@ function persistCurrentSession() {
     title: firstUser.slice(0, 48),
     preview: lastBot.slice(0, 90),
     timestamp: Date.now(),
-    messages: state.currentMessages
+    messages: state.currentMessages.map(m => {
+      const { attachedImageDataUrl, ...rest } = m;
+      return rest;
+    })
   };
 
   const index = state.chatHistory.findIndex((item) => item.id === session.id);
@@ -491,8 +792,9 @@ function setScreen(screenName, options = {}) {
     renderProfile();
   }
 
-  if (screenName === "chat") {
-    setTimeout(() => messageEl.focus(), 340); // wait for transition
+  if (screenName === "home") {
+    // Focus the composer when landing on home screen
+    setTimeout(() => messageEl?.focus(), 340);
   }
 
   if (options.prefill) setComposerDraft(options.prefill);
@@ -572,18 +874,38 @@ window.__kairoSetProfile = function ({ name, email, photoURL }) {
   renderProfile();
 };
 
+window.__kairoLoadPreferences = function (preferences) {
+  if (preferences && typeof preferences.autoSpeakEnabled === 'boolean') {
+    state.autoSpeakEnabled = preferences.autoSpeakEnabled;
+    updateSpeechToggle(); // Updates UI and localStorage
+  }
+};
+
+// Called by firebase-auth.js to load Firestore chat history into app state
+window.__kairoLoadHistory = function (firestoreHistory) {
+  if (!firestoreHistory || !Array.isArray(firestoreHistory)) return;
+  // Merge: prefer Firestore data (it's the source of truth after deploy)
+  if (firestoreHistory.length > 0) {
+    state.chatHistory = firestoreHistory;
+    saveHistory();
+    renderHistoryLists();
+    renderProfile();
+    console.log("[KAIRO] Firestore chat history synced:", firestoreHistory.length, "sessions");
+  }
+};
+
 window.__kairoGoHome = function (user, isNewUser = false) {
   if (user) {
-    const name     = user.displayName || user.email?.split("@")[0] || "User";
+    const name = user.displayName || user.email?.split("@")[0] || "User";
     state.profile.name     = name;
     state.profile.email    = user.email    || "";
     state.profile.photoURL = user.photoURL || "";
     saveProfile();
     renderProfile();
   }
-  
+
   hideSplash();
-  
+
   if (isNewUser) {
     setTimeout(() => showGreeting(user), 80);
   } else {
@@ -610,31 +932,30 @@ function submitAuth(event) {
 
   const email    = form.querySelector("[name='email']")?.value?.trim() || "";
   const password = form.querySelector("[name='password']")?.value?.trim() || "";
-  const name     = form.querySelector("[name='name']")?.value?.trim() || "";
-
-  const fb = window.__firebaseAuth;
-
-  if (!fb) {
-    // Firebase not loaded yet — fallback to local mode
-    if (name) state.profile.name = name;
-    else if (email && state.profile.name === "User") state.profile.name = email.split("@")[0] || "User";
-    state.profile.email = email || state.profile.email;
-    saveProfile();
-    renderProfile();
-    setScreen("home");
-    return;
-  }
-
-  if (formId === "signup-form") {
-    fb.signUp(name, email, password);
-  } else {
-    fb.signIn(email, password);
-  }
+  
+  localLogin(email, password);
 }
 
 function buildModelHistory() {
-  return state.currentMessages
-    .filter((msg) => msg.role === "user" || msg.role === "bot")
+  // Silently include messages from the previous session to maintain long-term memory
+  let pastMessages = [];
+  if (state.chatHistory && state.chatHistory.length > 0) {
+    const lastSession = state.chatHistory[state.chatHistory.length - 1];
+    // Only pull from lastSession if we are currently in a new, different session
+    if (lastSession.id !== state.currentSessionId) {
+      pastMessages = lastSession.messages || [];
+    }
+  }
+
+  const allMessages = [...pastMessages, ...state.currentMessages]
+    .filter((msg) => msg.role === "user" || msg.role === "bot");
+  
+  // Remove the very last message since it's the current user prompt being sent
+  if (allMessages.length > 0 && allMessages[allMessages.length - 1].role === "user") {
+    allMessages.pop();
+  }
+
+  return allMessages
     .slice(-10)
     .map((msg) => ({
       role: msg.role === "bot" ? "assistant" : "user",
@@ -689,27 +1010,25 @@ signupFormEl?.addEventListener("submit", submitAuth);
 
 // ─── Forgot Password ───
 document.getElementById("forgot-password-btn")?.addEventListener("click", () => {
-  const emailVal = document.getElementById("signin-email")?.value?.trim();
-  const fb = window.__firebaseAuth;
-  if (fb) fb.forgotPassword(emailVal);
-  else alert("Firebase is still loading. Please wait a moment and try again.");
+  alert("Local demo mode: forgot password not available.");
 });
 
-// ─── Google Sign In (Sign In screen) ───
-document.getElementById("google-signin-btn")?.addEventListener("click", () => {
-  const fb = window.__firebaseAuth;
-  if (fb) fb.googleSignIn();
-  else alert("Firebase is still loading. Please wait a moment and try again.");
+// ─── Google Sign-In / Sign-Up buttons ───
+["google-signin-btn", "google-signup-btn"].forEach((id) => {
+  document.getElementById(id)?.addEventListener("click", () => {
+    alert("Local demo mode: Google sign-in not available.");
+  });
 });
 
-// ─── Google Sign In (Sign Up screen) ───
-document.getElementById("google-signup-btn")?.addEventListener("click", () => {
-  const fb = window.__firebaseAuth;
-  if (fb) fb.googleSignIn();
-  else alert("Firebase is still loading. Please wait a moment and try again.");
+// ─── Apple Sign-In / Sign-Up buttons ───
+["apple-signin-btn", "apple-signup-btn"].forEach((id) => {
+  document.getElementById(id)?.addEventListener("click", () => {
+    alert("Local demo mode: Apple sign-in not available.");
+  });
 });
 
 speechToggleEl?.addEventListener("click", () => {
+  unlockSpeech();
   state.autoSpeakEnabled = !state.autoSpeakEnabled;
   localStorage.setItem(STORAGE_VOICE, state.autoSpeakEnabled ? "on" : "off");
   updateSpeechToggle();
@@ -719,6 +1038,7 @@ speechToggleEl?.addEventListener("click", () => {
 });
 
 homeSpeechToggleEl?.addEventListener("click", () => {
+  unlockSpeech();
   state.autoSpeakEnabled = !state.autoSpeakEnabled;
   localStorage.setItem(STORAGE_VOICE, state.autoSpeakEnabled ? "on" : "off");
   updateSpeechToggle();
@@ -776,35 +1096,47 @@ homeNewChatBtnEl?.addEventListener("click", () => {
 
 homeClearChatBtnEl?.addEventListener("click", () => {
   stopSpeaking();
+
   state.attachedImage.chat = null;
   state.attachedImage.home = null;
-  imageInputEl.value = "";
+  if (imageInputEl) imageInputEl.value = "";
   if (homeImageInputEl) homeImageInputEl.value = "";
   renderImagePreview("chat");
   renderImagePreview("home");
   setComposerDraft("");
 
+  // Close menu
+  closeHomeMenu();
+
   startNewSession();
   clearChatStream();
   appendChatMessage(state.currentMessages[0]);
+  updateHomeView();
+  renderProfile();
 });
 
 homeMenuNewChatEl?.addEventListener("click", () => {
   stopSpeaking();
   persistCurrentSession();
+
+  // Reset attached images
   state.attachedImage.chat = null;
   state.attachedImage.home = null;
-  imageInputEl.value = "";
+  if (imageInputEl) imageInputEl.value = "";
   if (homeImageInputEl) homeImageInputEl.value = "";
   renderImagePreview("chat");
   renderImagePreview("home");
   setComposerDraft("");
 
+  // Close menu first
+  closeHomeMenu();
+
+  // Start fresh session and show home screen with greeting
   startNewSession();
   clearChatStream();
   appendChatMessage(state.currentMessages[0]);
-  closeHomeMenu();
-  setScreen("chat");
+  updateHomeView();      // ← shows greeting, hides stale chat stream
+  renderProfile();       // ← refreshes greeting text with correct time
 });
 
 async function handleImageInputChange(mode) {
@@ -864,6 +1196,7 @@ homeMessageEl?.addEventListener("keydown", (event) => {
 });
 
 async function submitComposer(mode) {
+  unlockSpeech(); // Mobile requires speech synthesis to be initialized synchronously from user action
   const textEl = mode === "home" ? homeMessageEl : messageEl;
   const sendButtonEl = mode === "home" ? homeSendEl : sendEl;
 
@@ -878,19 +1211,28 @@ async function submitComposer(mode) {
     role: "user",
     text: message || "Image attached for solving.",
     time: Date.now(),
-    imageAttached: Boolean(attachedImage)
+    imageAttached: Boolean(attachedImage),
+    attachedImageDataUrl: attachedImage?.dataUrl || null
   };
 
   state.currentMessages.push(userMsg);
   appendChatMessage(userMsg);
 
   if (mode === "home") {
-    setScreen("chat");
+    // 'chat' screen no longer exists — home screen IS the chat screen
+    setScreen("home");
   }
 
   textEl.value = "";
   autoResizeTextarea(textEl);
   sendButtonEl.disabled = true;
+
+  // Clear the image preview immediately before sending to API
+  const requestImageDataUrl = attachedImage?.dataUrl || null;
+  state.attachedImage[mode] = null;
+  if (mode === "home" && homeImageInputEl) homeImageInputEl.value = "";
+  if (mode === "chat") imageInputEl.value = "";
+  renderImagePreview(mode);
 
   const typingNode = document.createElement("article");
   typingNode.className = "chat-message chat-message--bot";
@@ -908,7 +1250,7 @@ async function submitComposer(mode) {
       body: JSON.stringify({
         message: message || "Please solve the image I attached.",
         history: buildModelHistory(),
-        imageDataUrl: attachedImage?.dataUrl || null
+        imageDataUrl: requestImageDataUrl
       })
     });
 
@@ -988,11 +1330,6 @@ async function submitComposer(mode) {
     }
 
     persistCurrentSession();
-
-    state.attachedImage[mode] = null;
-    if (mode === "home" && homeImageInputEl) homeImageInputEl.value = "";
-    if (mode === "chat") imageInputEl.value = "";
-    renderImagePreview(mode);
   } catch {
     typingNode.remove();
     const botMsg = {
@@ -1027,35 +1364,64 @@ function handleHistoryClick(event) {
   const sessionId = card.getAttribute("data-session-id");
   if (!sessionId) return;
 
-  loadSession(sessionId);
-  setScreen("chat");
+  loadSession(sessionId);   // loads messages + calls updateHomeView
+  setScreen("home");        // navigate to home (which is the chat screen)
 }
 
 recentActivityEl?.addEventListener("click", handleHistoryClick);
 historyListEl?.addEventListener("click", handleHistoryClick);
 
-// ─── Sign Out: wire all [data-target="signin"] buttons to Firebase ───
+// ─── Suggestion Chips: tap to pre-fill and send ───
+document.querySelectorAll("[data-suggestion]").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    const text = chip.getAttribute("data-suggestion");
+    if (!text) return;
+    messageEl.value = text;
+    autoResizeTextarea(messageEl);
+    messageEl.focus();
+    submitComposer("chat");
+  });
+});
+
+// ─── Profile action buttons (data-target routing) ───
+document.querySelectorAll(".profile-action-btn[data-target]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const target = btn.getAttribute("data-target");
+    if (!target) return;
+    if (target === "signin") {
+      localLogout();
+      return;
+    }
+    setScreen(target);
+  });
+});
+
+// ─── Sign Out: wire hamburger menu sign-out button ───
 document.querySelectorAll("[data-target='signin']").forEach((btn) => {
-  // Only intercept the Sign Out button in the home menu (not the auth buttons)
-  if (btn.textContent.trim().toLowerCase() === "sign out") {
+  if (btn.textContent.trim().toLowerCase().includes("sign out")) {
     btn.addEventListener("click", () => {
-      const fb = window.__firebaseAuth;
-      if (fb) fb.signOut();
+      localLogout();
     });
   }
 });
 
 function updateHomeView() {
-  const hasMessages = state.currentMessages.length > 1;
+  const hasMessages = state.currentMessages.length > 0;
   if (hasMessages) {
     kairoHomeGreetingEl?.classList.add("is-hidden");
-    homeChatActionsEl?.classList.remove("is-hidden");
     chatStreamEl?.classList.remove("is-hidden");
   } else {
     kairoHomeGreetingEl?.classList.remove("is-hidden");
-    homeChatActionsEl?.classList.add("is-hidden");
     chatStreamEl?.classList.add("is-hidden");
   }
+
+  // Update stat counters on profile screen
+  if (statChatsEl) statChatsEl.textContent = state.chatHistory.length;
+  if (statMessagesEl) {
+    const total = state.chatHistory.reduce((sum, s) => sum + (s.messages?.length || 0), 0);
+    statMessagesEl.textContent = total;
+  }
+  if (statVoiceEl) statVoiceEl.textContent = state.autoSpeakEnabled ? "On" : "Off";
 }
 
 updateSpeechToggle();
@@ -1064,8 +1430,17 @@ renderImagePreview("chat");
 renderImagePreview("home");
 renderHistoryLists();
 
-startNewSession();
-clearChatStream();
-appendChatMessage(state.currentMessages[0]);
+startNewSession(true);
 
-setScreen("onboarding");
+if (localStorage.getItem("kairo_user")) {
+  state.profile.name = localStorage.getItem("kairo_user").split("@")[0];
+  state.profile.email = localStorage.getItem("kairo_user");
+  renderProfile();
+  hideSplash();
+  setScreen("home");
+} else {
+  hideSplash();
+  setScreen("onboarding");
+}
+
+
