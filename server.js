@@ -21,7 +21,7 @@ const getTextProviders = () => {
   if (isLocal) {
     // ✅ Use local Ollama (no internet needed)
     return [{
-      url: "http://localhost:11434/api/chat",
+      url: "http://localhost:11434/v1/chat/completions",
       model: "mistral",
       headers: { "Content-Type": "application/json" }
     }];
