@@ -27,6 +27,12 @@ self.addEventListener("install", (event) => {
 
 // Fetch
 self.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
+  // Bypass service worker for API calls and external model downloads (Hugging Face / WebLLM)
+  if (url.pathname.startsWith('/api/') || url.hostname !== location.hostname) {
+    return; // Let the browser handle it normally
+  }
+
   event.respondWith(
     caches.match(event.request).then((response) => {
       return response || fetch(event.request);
