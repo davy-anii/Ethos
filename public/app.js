@@ -1244,20 +1244,45 @@ async function submitComposer(mode) {
   chatStreamEl.scrollTop = chatStreamEl.scrollHeight;
 
   try {
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: message || "Please solve the image I attached.",
-        history: buildModelHistory(),
-        imageDataUrl: requestImageDataUrl
-      })
-    });
+    let responseOk = false;
+    let data = {};
+    
+    if (window.localAIEngine) {
+      // Local WebLLM mode (fully offline on device)
+      try {
+        const messages = buildModelHistory();
+        const textContent = message || (requestImageDataUrl ? "Please analyze the image I attached." : "");
+        messages.push({ role: "user", content: textContent });
+        
+        const completion = await window.localAIEngine.chat.completions.create({
+          messages,
+          temperature: 0.7,
+        });
+        
+        data = { reply: completion.choices[0].message.content };
+        responseOk = true;
+      } catch (err) {
+        responseOk = false;
+        data = { error: "Local AI Engine error: " + err.message };
+      }
+    } else {
+      // Normal server mode
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: message || "Please solve the image I attached.",
+          history: buildModelHistory(),
+          imageDataUrl: requestImageDataUrl
+        })
+      });
+      data = await response.json();
+      responseOk = response.ok;
+    }
 
-    const data = await response.json();
     typingNode.remove();
 
-    let reply = response.ok ? data.reply : data.error || "Something went wrong.";
+    let reply = responseOk ? data.reply : data.error || "Something went wrong.";
 
     // Check if bot wants to generate an image
     const imgMatch = reply.match(/\[GENERATE_IMAGE:\s*(.+?)\]/i);
@@ -1324,7 +1349,7 @@ async function submitComposer(mode) {
       state.currentMessages.push(botMsg);
       appendChatMessage(botMsg);
 
-      if (response.ok && state.autoSpeakEnabled) {
+      if (responseOk && state.autoSpeakEnabled) {
         speakText(reply);
       }
     }
