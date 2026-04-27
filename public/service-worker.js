@@ -4,7 +4,16 @@ const urlsToCache = [
   "/index.html",
   "/app.js",
   "/styles.css",
-  "/site.webmanifest"
+  "/site.webmanifest",
+  "/favicon.ico",
+  "/lucide.standalone.js",
+  "/fonts/inter-local.css",
+  "/fonts/inter-regular.woff2",
+  "/icons/apple-touch-icon.png",
+  "/icons/favicon-16x16.png",
+  "/icons/favicon-32x32.png",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png"
 ];
 
 // Install
